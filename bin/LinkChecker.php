@@ -15,12 +15,22 @@
 
 <?php
 
+$httpresponses = "";
+
 if (isset($_POST['url'])) {
 	
-	echo "<P>Scanning URL '" . $_POST['url'] . "'...<P>";
+	echo "<P>Scanning URL <a href='" . $_POST['url'] . "'>'" . $_POST['url'] . "'</a>...<P>";
 	
+	# Load HTTP Responses Codes into global
+	loadHTTPResponses();
+	
+	# Scan page contents into variable
 	$page_contents = scanURL($_POST['url']);
+	
+	# Locate and sanitise URLs
 	$valid_urls = resolveLinks($page_contents);
+	
+	# Request URLs
 	checkLinks($valid_urls);
 	
 }
@@ -63,19 +73,32 @@ function checkLinks($array) {
 	
 	echo "Located " . $num_urls . " URLs on this page;<p>";
 
-	echo "<table cellpadding=2 cellspacing=3 border=1 width=100%>";
-	echo "<tr><td>URL<td>HTTP Code</tr>";
+	echo "<table cellpadding=4 cellspacing=0 border=1 width=100%>";
+	echo "<tr bgcolor=#ccc><td><td>URL<td>HTTP Code</tr>";
 	
 	for ($u = 0; $u < $num_urls; $u++) {
 
+		$row = $u + 1;
+		echo "<tr><td width=30px align=center>" . $row;
+	
 		if (strlen($array[$u]) < 100) {
-			echo "<tr><td>" . $array[$u];	
+			echo "<td><a href='" . $array[$u] . "' target='_blank'>" . $array[$u] . "</a>";	
 		} else {
-			echo "<tr><td><abbr title='" . $array[$u] . "'>" . substr($array[$u], 0, 100) . "...</abbr>";	
+			echo "<td><a href='" . $array[$u] . "' target='_blank'><abbr title='" . $array[$u] . "'>" . substr($array[$u], 0, 100) . "...</abbr></a>";	
 		}
 		$return_info = requestURL($array[$u]);
 		$http_code = $return_info['http_code'];
-		echo "<td width=100px align=center><a href='https://httpstatuses.com/" . $http_code . "' target='_new'>" . $http_code . "</a>";
+		if (substr($http_code, 0, 1) > 3) { # Failure
+			$color = "#ff9980";
+		} elseif (substr($http_code, 0, 1) == 3) { # Redirect
+			$color = "#ffbf80";
+		} elseif (substr($http_code, 0, 1) == 0) {
+			$color = "#ddd";
+		} else {
+			$color = "#9f9";
+		}
+		$http_code_description = lookupHTTPResponse($http_code);
+		echo "<td width=200px align=left bgcolor=" . $color . "><a href='https://httpstatuses.com/" . $http_code . "' target='_new'>" . $http_code . " " . $http_code_description . "</a>";
 		echo "</tr>";
 
 	}
@@ -105,6 +128,33 @@ function requestURL($url) {
 	curl_close($curl);
 	
 	return $info;
+	
+}
+
+function lookupHTTPResponse($http_code) {
+	
+	$description = "";
+	
+	if ($http_code == 0) {
+		$description = "Unknown";
+	} else {
+		for ($h = 0; $h < count($GLOBALS['httpresponses']); $h++) {
+			$components = explode(",", $GLOBALS['httpresponses'][$h]);
+			if ($components[0] == $http_code) {
+				$description = $components[1];
+			}
+		}
+	}
+	
+	return $description;
+	
+}
+
+function loadHTTPResponses() {
+	
+	# Should read contents of file into global array
+	$GLOBALS['httpresponses'] = file("httpresponse.txt");
+	#print_r($GLOBALS['httpresponses']);
 	
 }
 
